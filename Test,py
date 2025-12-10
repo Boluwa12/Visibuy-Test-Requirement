@@ -1,0 +1,93 @@
+import cv2
+import tkinter as tk
+from tkinter import filedialog
+import numpy as np
+from PIL import Image
+from PIL.ExifTags import TAGS
+
+root = tk.Tk()
+root.geometry("800x800")
+root.title("Home")
+result = tk.Label(root, text="")
+exif_result = tk.Label(root, text="")
+exif_result2 = tk.Label(root, text="")
+
+
+def detect_phash(image_path):
+    global img
+    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    img = cv2.resize(img, (32, 32))
+
+    dct = cv2.dct(np.float32(img))
+    
+    median = np.median(dct)
+    hash_bits = (dct > median).astype(int)
+
+    hash_str = ''.join(str(b) for b in hash_bits.flatten())
+
+    return hash_str
+
+
+def hamming():
+    suspicious = False
+
+    img1 = filedialog.askopenfilename(title="Select an Image to compare", filetypes=[('Image files', '*.jpg *.png *.jpeg')])
+    img2 = filedialog.askopenfilename(title="Select another Image", filetypes=[('Image files', '*.jpg *.png *.jpeg')])
+
+    hamm =  sum(c1 != c2 for c1, c2 in zip(detect_phash(img1), detect_phash(img2)))
+
+    img_pil = Image.open(img1)
+    exif_data = img_pil.getexif()
+
+    if exif_data:
+        readable_exif = {}
+        for tag_id, value in exif_data.items():
+            tag_name = TAGS.get(tag_id, tag_id)
+            readable_exif[tag_name] = value
+
+        for key, val in readable_exif.items():
+            print(f"{key}: {value}")
+
+    else:
+        print('No EXIF metadata found')
+        suspicious = True
+
+    img_pil2 = Image.open(img2)
+    exif_data2 = img_pil2.getexif()
+
+    if exif_data2:
+        readable_exif2 = {}
+        for tag_id, value in exif_data2.items():
+            tag_name = TAGS.get(tag_id, tag_id)
+            readable_exif2[tag_name] = value
+
+        for key, val in readable_exif2.items():
+            print(f"{key}: {value}")
+
+    else:
+        print('No EXIF metadata found')
+        suspicious = True
+
+    if hamm == 0:
+        result.config(text=f'Your images are identical')
+
+    elif hamm <= 10 and hamm > 0:
+        result.config(text=f'Your images are very similar, but different')
+
+    elif hamm >= 20:
+        result.config(text=f'Your images are different')
+
+    if suspicious == False:
+        exif_result.config(text=f'Exif data is available')
+    elif suspicious == True:
+        exif_result.config(text=f'EXIF DATA IS MISSING')
+
+
+select_imgs = tk.Button(root, text='Select images', command=hamming, fg='white', bg='blue', font=("Arial", 14))
+select_imgs.pack(pady=20)
+
+result.pack(pady=20)
+exif_result.pack(pady=20)
+exif_result2.pack(pady=20)
+
+root.mainloop()
